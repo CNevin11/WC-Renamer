@@ -446,11 +446,33 @@
       return file.webkitRelativePath || file.name;
     }
 
+    function escapeRegExp(value) {
+      return String(value).replace(/[.*+?^${}()|[\]\]/g, '\$&');
+    }
+
+    function buildKeyRegex(key) {
+      // Support:
+      // SId-123_TCId-456
+      // SId-123-TCId-456
+      // Sid-123_Tcid-456
+      // etc.
+
+      const normalized = String(key)
+        .replace(/_/g, '[-_]');
+
+      return new RegExp(normalized, 'i');
+    }
+
+    function fileNameContainsKey(file, key) {
+      const fileName = getRelativePath(file).split('/').pop();
+      return buildKeyRegex(key).test(fileName);
+    }
+
     function replaceKeyInPath(path, oldKey, newKey) {
       const slashIndex = path.lastIndexOf('/');
       const folder = slashIndex >= 0 ? path.slice(0, slashIndex + 1) : '';
       const name = slashIndex >= 0 ? path.slice(slashIndex + 1) : path;
-      return folder + name.replace(oldKey, newKey);
+      return folder + name.replace(buildKeyRegex(oldKey), newKey);
     }
 
     function makeReportRecord({ result, row, originalFile = '', outputFile = '', reason = '' }) {
@@ -579,7 +601,7 @@
             continue;
           }
 
-          const matches = imageFiles.filter(file => getRelativePath(file).split('/').pop().includes(oldKey));
+          const matches = imageFiles.filter(file => fileNameContainsKey(file, oldKey));
 
           if (!matches.length) {
             const section = row.SECTION_ID ? `SID${row.SECTION_ID}` : oldKey;
