@@ -447,8 +447,8 @@
     }
 
     function escapeRegExp(value) {
-      return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
+      return String(value).replace(/[.*+?^${}()|[\]\]/g, '\$&');
+    }
 
     function buildKeyRegex(key) {
       // Support:
@@ -575,8 +575,57 @@
 
         let renamedCount = 0;
 
-        const actionableRows = records.filter(row => allowedStatuses.has(row.RENAME_STATUS));
+        const rawActionableRows = records.filter(row => allowedStatuses.has(row.RENAME_STATUS));
         const skippedRows = records.filter(row => !allowedStatuses.has(row.RENAME_STATUS));
+
+        // Split sections can create duplicate CSV rows for the same image key.
+        // Rename once per distinct OLD_IMAGE_KEY -> NEW_IMAGE_KEY pair.
+        const actionMap = new Map();
+        const duplicateRows = [];
+        const ambiguousRows = [];
+
+        for (const row of rawActionableRows) {
+          const oldKey = row.OLD_IMAGE_KEY || '';
+          const newKey = row.NEW_IMAGE_KEY || '';
+
+          if (!oldKey || !newKey) {
+            duplicateRows.push({ row, reason: 'Missing OLD_IMAGE_KEY or NEW_IMAGE_KEY.' });
+            continue;
+          }
+
+          if (!actionMap.has(oldKey)) {
+            actionMap.set(oldKey, row);
+            continue;
+          }
+
+          const existing = actionMap.get(oldKey);
+          if ((existing.NEW_IMAGE_KEY || '') === newKey) {
+            duplicateRows.push({ row, reason: 'Duplicate split-section row ignored. Same OLD_IMAGE_KEY and NEW_IMAGE_KEY already queued.' });
+          } else {
+            ambiguousRows.push({
+              row,
+              reason: 'Ambiguous duplicate OLD_IMAGE_KEY. Existing target is ' + existing.NEW_IMAGE_KEY + '; this row targets ' + newKey + '.'
+            });
+          }
+        }
+
+        const actionableRows = Array.from(actionMap.values());
+
+        for (const item of duplicateRows) {
+          report.push(makeReportRecord({
+            result: 'SKIPPED',
+            row: item.row,
+            reason: item.reason
+          }));
+        }
+
+        for (const item of ambiguousRows) {
+          report.push(makeReportRecord({
+            result: 'FAILED',
+            row: item.row,
+            reason: item.reason
+          }));
+        }
 
         for (const row of skippedRows) {
           if (row.RENAME_STATUS && row.RENAME_STATUS !== 'NO_RENAME_NEEDED') {
@@ -722,7 +771,7 @@
     resetBtn.addEventListener('click', resetTool);
   </script>
   <div style="text-align:center; font-size:11px; color:#6b7280; padding:12px 0 18px;">
-    V4
+    V5
   </div>
 </body>
 </html>
