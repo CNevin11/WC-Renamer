@@ -261,11 +261,11 @@
         <h2>3. Processing options</h2>
         <div class="controls">
           <label class="check">
-            <input id="includeRowReview" type="checkbox" />
+            <input id="includeRowReview" type="checkbox" checked disabled />
             Include RENAME_NEEDED_ROW_REVIEW rows
           </label>
           <label class="check">
-            <input id="includeSplitReview" type="checkbox" />
+            <input id="includeSplitReview" type="checkbox" checked disabled />
             Include RENAME_NEEDED_SPLIT_SECTION_REVIEW rows
           </label>
           <label class="check">
@@ -278,7 +278,7 @@
           <button id="resetBtn" class="secondary">Reset</button>
         </div>
         <p class="small">
-          Default behaviour is conservative: only <code>RENAME_NEEDED</code> rows are renamed automatically. Review rows are reported unless you choose to include them.
+          The tool ignores row-level review severity for renaming. It processes any row with a valid <code>OLD_IMAGE_KEY</code> and <code>NEW_IMAGE_KEY</code>. Failures should only be missing source images, ambiguous duplicate mappings, or output filename collisions.
         </p>
       </section>
     </div>
@@ -432,10 +432,13 @@
     }
 
     function getAllowedStatuses() {
-      const statuses = new Set(['RENAME_NEEDED']);
-      if (includeRowReview.checked) statuses.add('RENAME_NEEDED_ROW_REVIEW');
-      if (includeSplitReview.checked) statuses.add('RENAME_NEEDED_SPLIT_SECTION_REVIEW');
-      return statuses;
+      // For the image renamer, row-level review statuses should not block processing.
+      // The rename unit is the image key: SId + TCId.
+      return new Set([
+        'RENAME_NEEDED',
+        'RENAME_NEEDED_ROW_REVIEW',
+        'RENAME_NEEDED_SPLIT_SECTION_REVIEW'
+      ]);
     }
 
     function isImageFile(file) {
@@ -758,8 +761,8 @@
     function resetTool() {
       csvInput.value = '';
       folderInput.value = '';
-      includeRowReview.checked = false;
-      includeSplitReview.checked = false;
+      includeRowReview.checked = true;
+      includeSplitReview.checked = true;
       copyUnchanged.checked = true;
       reportBody.innerHTML = '<tr><td colspan="5" class="small">No processing run yet.</td></tr>';
       stats.style.display = 'none';
@@ -771,7 +774,7 @@
     resetBtn.addEventListener('click', resetTool);
   </script>
   <div style="text-align:center; font-size:11px; color:#6b7280; padding:12px 0 18px;">
-    V6
+    V7
   </div>
 </body>
 </html>
