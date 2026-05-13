@@ -446,21 +446,21 @@
       return file.webkitRelativePath || file.name;
     }
 
-    function escapeRegExp(value) {
-      return String(value).replace(/[.*+?^${}()|[\]\]/g, '\$&');
-    }
-
     function buildKeyRegex(key) {
-      // Support:
-      // SId-123_TCId-456
-      // SId-123-TCId-456
-      // Sid-123_Tcid-456
-      // etc.
+      // Convert SId-123_TCId-456 or SId-123-TCId-456 into a flexible matcher.
+      // This avoids fragile regex escaping and supports hyphen/underscore variants.
+      const keyText = String(key || '').toLowerCase().replace(/_/g, '-');
+      const parts = keyText.split('-');
+      const sidIndex = parts.indexOf('sid');
+      const tcidIndex = parts.indexOf('tcid');
 
-      const normalized = String(key)
-        .replace(/_/g, '[-_]');
+      if (sidIndex >= 0 && tcidIndex >= 0 && parts[sidIndex + 1] && parts[tcidIndex + 1]) {
+        const sectionId = parts[sidIndex + 1];
+        const ticketClassId = parts[tcidIndex + 1];
+        return new RegExp('sid[-_]' + sectionId + '[-_]tcid[-_]' + ticketClassId, 'i');
+      }
 
-      return new RegExp(normalized, 'i');
+      return new RegExp(String(key || '').replace(/_/g, '[-_]').replace(/-/g, '[-_]'), 'i');
     }
 
     function fileNameContainsKey(file, key) {
@@ -771,7 +771,7 @@
     resetBtn.addEventListener('click', resetTool);
   </script>
   <div style="text-align:center; font-size:11px; color:#6b7280; padding:12px 0 18px;">
-    V5
+    V3
   </div>
 </body>
 </html>
