@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCID Image Renamer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #374151;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --blue: #38bdf8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #020617, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    header {
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin: 0 0 8px;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      max-width: 760px;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+    }
+
+    .card h2 {
+      font-size: 18px;
+      margin: 0 0 12px;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: var(--panel-2);
+      color: var(--text);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      background: var(--blue);
+      color: #00111a;
+      font-weight: 700;
+      padding: 12px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .secondary {
+      background: #334155;
+      color: var(--text);
+    }
+
+    .danger {
+      background: #7f1d1d;
+      color: #fee2e2;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .stat {
+      background: rgba(31, 41, 55, 0.8);
+      border: 1px solid var(--border);
+      padding: 14px;
+      border-radius: 14px;
+    }
+
+    .stat .num {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .stat .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .ok { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+    .warn { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+    .bad { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+    .skip { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+
+    .log {
+      max-height: 420px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #020617;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #1f2937;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #0b1220;
+      color: #cbd5e1;
+      z-index: 1;
+    }
+
+    code {
+      background: rgba(148, 163, 184, 0.15);
+      padding: 2px 5px;
+      border-radius: 6px;
+      color: #e5e7eb;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .full { grid-column: 1 / -1; }
+
+    .downloads {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    a.download {
+      display: inline-block;
+      color: #00111a;
+      background: var(--good);
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    @media (max-width: 760px) {
+      .grid, .stats { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>TCID Image Renamer</h1>
+      <div class="subtitle">
+        Upload the Hex Tab 3 CSV and a folder of images. The tool finds filenames containing <code>OLD_IMAGE_KEY</code>, replaces that part with <code>NEW_IMAGE_KEY</code>, and exports a renamed ZIP plus a processing report.
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>1. Upload rename CSV</h2>
+        <label for="csvInput">Expected columns: RENAME_STATUS, OLD_IMAGE_KEY, NEW_IMAGE_KEY</label>
+        <input id="csvInput" type="file" accept=".csv,text/csv" />
+        <p class="small">Use the Tab 3 export from Hex. Extra columns are kept in the report where possible.</p>
+      </section>
+
+      <section class="card">
+        <h2>2. Upload image folder</h2>
+        <label for="folderInput">Select the folder containing images to rename</label>
+        <input id="folderInput" type="file" webkitdirectory directory multiple />
+        <p class="small">The app does not modify your local files. It creates a renamed ZIP output.</p>
+      </section>
+
+      <section class="card full">
+        <h2>3. Processing options</h2>
+        <div class="controls">
+          <label class="check">
+            <input id="includeRowReview" type="checkbox" />
+            Include RENAME_NEEDED_ROW_REVIEW rows
+          </label>
+          <label class="check">
+            <input id="includeSplitReview" type="checkbox" />
+            Include RENAME_NEEDED_SPLIT_SECTION_REVIEW rows
+          </label>
+          <label class="check">
+            <input id="copyUnchanged" type="checkbox" checked />
+            Copy unchanged / skipped images into ZIP
+          </label>
+        </div>
+        <div class="controls">
+          <button id="processBtn">Process Images</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+        </div>
+        <p class="small">
+          Default behaviour is conservative: only <code>RENAME_NEEDED</code> rows are renamed automatically. Review rows are reported unless you choose to include them.
+        </p>
+      </section>
+    </div>
+
+    <section class="stats" id="stats" style="display:none;">
+      <div class="stat"><div class="num" id="statCsvRows">0</div><div class="label">CSV rows</div></div>
+      <div class="stat"><div class="num" id="statImages">0</div><div class="label">Images loaded</div></div>
+      <div class="stat"><div class="num" id="statRenamed">0</div><div class="label">Renamed</div></div>
+      <div class="stat"><div class="num" id="statIssues">0</div><div class="label">Issues / skipped</div></div>
+    </section>
+
+    <section class="card" id="downloadCard" style="display:none;">
+      <h2>Downloads</h2>
+      <div class="downloads" id="downloads"></div>
+    </section>
+
+    <section class="card">
+      <h2>Report preview</h2>
+      <div class="log">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Old Key</th>
+              <th>New Key</th>
+              <th>File</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="reportBody">
+            <tr><td colspan="5" class="small">No processing run yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const csvInput = document.getElementById('csvInput');
+    const folderInput = document.getElementById('folderInput');
+    const processBtn = document.getElementById('processBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const reportBody = document.getElementById('reportBody');
+    const stats = document.getElementById('stats');
+    const downloadCard = document.getElementById('downloadCard');
+    const downloads = document.getElementById('downloads');
+
+    const includeRowReview = document.getElementById('includeRowReview');
+    const includeSplitReview = document.getElementById('includeSplitReview');
+    const copyUnchanged = document.getElementById('copyUnchanged');
+
+    const statCsvRows = document.getElementById('statCsvRows');
+    const statImages = document.getElementById('statImages');
+    const statRenamed = document.getElementById('statRenamed');
+    const statIssues = document.getElementById('statIssues');
+
+    const REQUIRED_COLUMNS = ['RENAME_STATUS', 'OLD_IMAGE_KEY', 'NEW_IMAGE_KEY'];
+
+    function normaliseHeader(value) {
+      return String(value || '')
+        .trim()
+        .replace(/^\uFEFF/, '')
+        .replace(/\s+/g, '_')
+        .toUpperCase();
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let current = [];
+      let field = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          current.push(field);
+          field = '';
+        } else if ((char === '\n' || char === '\r') && !inQuotes) {
+          if (char === '\r' && next === '\n') i++;
+          current.push(field);
+          rows.push(current);
+          current = [];
+          field = '';
+        } else {
+          field += char;
+        }
+      }
+
+      if (field.length || current.length) {
+        current.push(field);
+        rows.push(current);
+      }
+
+      const nonEmptyRows = rows.filter(row => row.some(cell => String(cell).trim() !== ''));
+      if (!nonEmptyRows.length) return { headers: [], records: [] };
+
+      const rawHeaders = nonEmptyRows[0];
+      const headers = rawHeaders.map(normaliseHeader);
+
+      const records = nonEmptyRows.slice(1).map(row => {
+        const record = {};
+        headers.forEach((header, index) => {
+          record[header] = row[index] !== undefined ? String(row[index]).trim() : '';
+        });
+        return record;
+      });
+
+      return { headers, records };
+    }
+
+    function csvEscape(value) {
+      const str = value === null || value === undefined ? '' : String(value);
+      if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    }
+
+    function buildCsv(records) {
+      const headers = [
+        'RESULT',
+        'RENAME_STATUS',
+        'SECTION_ID',
+        'CAT_SECTION_NAME',
+        'OLD_TICKETCLASS_ID',
+        'OLD_TICKETCLASS_NAME',
+        'NEW_TICKETCLASS_ID',
+        'NEW_TICKETCLASS_NAME',
+        'OLD_IMAGE_KEY',
+        'NEW_IMAGE_KEY',
+        'ORIGINAL_FILE',
+        'OUTPUT_FILE',
+        'REASON',
+        'REVIEW_NOTE'
+      ];
+
+      const lines = [headers.join(',')];
+      for (const record of records) {
+        lines.push(headers.map(header => csvEscape(record[header])).join(','));
+      }
+      return lines.join('\n');
+    }
+
+    function getAllowedStatuses() {
+      const statuses = new Set(['RENAME_NEEDED']);
+      if (includeRowReview.checked) statuses.add('RENAME_NEEDED_ROW_REVIEW');
+      if (includeSplitReview.checked) statuses.add('RENAME_NEEDED_SPLIT_SECTION_REVIEW');
+      return statuses;
+    }
+
+    function isImageFile(file) {
+      return /\.(jpg|jpeg|png|webp|gif|tif|tiff|bmp)$/i.test(file.name);
+    }
+
+    function getRelativePath(file) {
+      return file.webkitRelativePath || file.name;
+    }
+
+    function replaceKeyInPath(path, oldKey, newKey) {
+      const slashIndex = path.lastIndexOf('/');
+      const folder = slashIndex >= 0 ? path.slice(0, slashIndex + 1) : '';
+      const name = slashIndex >= 0 ? path.slice(slashIndex + 1) : path;
+      return folder + name.replace(oldKey, newKey);
+    }
+
+    function makeReportRecord({ result, row, originalFile = '', outputFile = '', reason = '' }) {
+      return {
+        RESULT: result,
+        RENAME_STATUS: row.RENAME_STATUS || '',
+        SECTION_ID: row.SECTION_ID || '',
+        CAT_SECTION_NAME: row.CAT_SECTION_NAME || row.SECTION_NAME || '',
+        OLD_TICKETCLASS_ID: row.OLD_TICKETCLASS_ID || '',
+        OLD_TICKETCLASS_NAME: row.OLD_TICKETCLASS_NAME || '',
+        NEW_TICKETCLASS_ID: row.NEW_TICKETCLASS_ID || '',
+        NEW_TICKETCLASS_NAME: row.NEW_TICKETCLASS_NAME || '',
+        OLD_IMAGE_KEY: row.OLD_IMAGE_KEY || '',
+        NEW_IMAGE_KEY: row.NEW_IMAGE_KEY || '',
+        ORIGINAL_FILE: originalFile,
+        OUTPUT_FILE: outputFile,
+        REASON: reason,
+        REVIEW_NOTE: row.REVIEW_NOTE || ''
+      };
+    }
+
+    function renderReport(records) {
+      reportBody.innerHTML = '';
+      const preview = records.slice(0, 300);
+
+      if (!preview.length) {
+        reportBody.innerHTML = '<tr><td colspan="5" class="small">No report rows.</td></tr>';
+        return;
+      }
+
+      for (const record of preview) {
+        const tr = document.createElement('tr');
+        const pillClass = record.RESULT === 'RENAMED' ? 'ok'
+          : record.RESULT === 'COPIED_UNCHANGED' ? 'skip'
+          : record.RESULT === 'SKIPPED' ? 'warn'
+          : 'bad';
+
+        tr.innerHTML = `
+          <td><span class="status-pill ${pillClass}">${escapeHtml(record.RESULT)}</span></td>
+          <td><code>${escapeHtml(record.OLD_IMAGE_KEY)}</code></td>
+          <td><code>${escapeHtml(record.NEW_IMAGE_KEY)}</code></td>
+          <td>${escapeHtml(record.ORIGINAL_FILE || record.OUTPUT_FILE || '')}</td>
+          <td>${escapeHtml(record.REASON)}</td>
+        `;
+        reportBody.appendChild(tr);
+      }
+
+      if (records.length > preview.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="5" class="small">Showing first ${preview.length} of ${records.length} report rows. Download the full report CSV for the full detail.</td>`;
+        reportBody.appendChild(tr);
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function downloadBlob(blob, filename, label) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.className = 'download';
+      link.textContent = label;
+      downloads.appendChild(link);
+    }
+
+    async function processImages() {
+      downloads.innerHTML = '';
+      downloadCard.style.display = 'none';
+      processBtn.disabled = true;
+      processBtn.textContent = 'Processing...';
+
+      try {
+        if (!csvInput.files.length) throw new Error('No CSV selected.');
+        if (!folderInput.files.length) throw new Error('No image folder selected.');
+        if (typeof JSZip === 'undefined') throw new Error('JSZip failed to load. Check internet access or host JSZip locally.');
+
+        const csvText = await csvInput.files[0].text();
+        const { headers, records } = parseCsv(csvText);
+
+        const missingColumns = REQUIRED_COLUMNS.filter(col => !headers.includes(col));
+        if (missingColumns.length) {
+          throw new Error(`CSV is missing required column(s): ${missingColumns.join(', ')}`);
+        }
+
+        const imageFiles = Array.from(folderInput.files).filter(isImageFile);
+        const allFiles = Array.from(folderInput.files);
+        const allowedStatuses = getAllowedStatuses();
+        const zip = new JSZip();
+        const report = [];
+        const usedInputPaths = new Set();
+        const outputPaths = new Set();
+
+        let renamedCount = 0;
+
+        const actionableRows = records.filter(row => allowedStatuses.has(row.RENAME_STATUS));
+        const skippedRows = records.filter(row => !allowedStatuses.has(row.RENAME_STATUS));
+
+        for (const row of skippedRows) {
+          if (row.RENAME_STATUS && row.RENAME_STATUS !== 'NO_RENAME_NEEDED') {
+            report.push(makeReportRecord({
+              result: 'SKIPPED',
+              row,
+              reason: `Rename status ${row.RENAME_STATUS} is not enabled for processing.`
+            }));
+          }
+        }
+
+        for (const row of actionableRows) {
+          const oldKey = row.OLD_IMAGE_KEY;
+          const newKey = row.NEW_IMAGE_KEY;
+
+          if (!oldKey || !newKey) {
+            report.push(makeReportRecord({
+              result: 'FAILED',
+              row,
+              reason: 'Missing OLD_IMAGE_KEY or NEW_IMAGE_KEY.'
+            }));
+            continue;
+          }
+
+          const matches = imageFiles.filter(file => getRelativePath(file).split('/').pop().includes(oldKey));
+
+          if (!matches.length) {
+            const section = row.SECTION_ID ? `SID${row.SECTION_ID}` : oldKey;
+            report.push(makeReportRecord({
+              result: 'FAILED',
+              row,
+              reason: `${section} / ${oldKey} does not exist in the selected image folder.`
+            }));
+            continue;
+          }
+
+          for (const file of matches) {
+            const inputPath = getRelativePath(file);
+            const outputPath = replaceKeyInPath(inputPath, oldKey, newKey);
+
+            if (outputPaths.has(outputPath)) {
+              report.push(makeReportRecord({
+                result: 'FAILED',
+                row,
+                originalFile: inputPath,
+                outputFile: outputPath,
+                reason: 'Output filename collision. Another file would be written with the same name.'
+              }));
+              continue;
+            }
+
+            const buffer = await file.arrayBuffer();
+            zip.file(outputPath, buffer);
+            outputPaths.add(outputPath);
+            usedInputPaths.add(inputPath);
+            renamedCount++;
+
+            report.push(makeReportRecord({
+              result: 'RENAMED',
+              row,
+              originalFile: inputPath,
+              outputFile: outputPath,
+              reason: 'Renamed successfully.'
+            }));
+          }
+        }
+
+        if (copyUnchanged.checked) {
+          for (const file of allFiles) {
+            const path = getRelativePath(file);
+            if (usedInputPaths.has(path)) continue;
+            if (outputPaths.has(path)) {
+              report.push({
+                RESULT: 'FAILED',
+                RENAME_STATUS: '',
+                SECTION_ID: '',
+                CAT_SECTION_NAME: '',
+                OLD_TICKETCLASS_ID: '',
+                OLD_TICKETCLASS_NAME: '',
+                NEW_TICKETCLASS_ID: '',
+                NEW_TICKETCLASS_NAME: '',
+                OLD_IMAGE_KEY: '',
+                NEW_IMAGE_KEY: '',
+                ORIGINAL_FILE: path,
+                OUTPUT_FILE: path,
+                REASON: 'Unchanged file output collision.',
+                REVIEW_NOTE: ''
+              });
+              continue;
+            }
+            const buffer = await file.arrayBuffer();
+            zip.file(path, buffer);
+            outputPaths.add(path);
+          }
+        }
+
+        const reportCsv = buildCsv(report);
+        zip.file('rename_report.csv', reportCsv);
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const reportBlob = new Blob([reportCsv], { type: 'text/csv;charset=utf-8' });
+
+        downloadBlob(zipBlob, 'renamed_images.zip', 'Download renamed ZIP');
+        downloadBlob(reportBlob, 'rename_report.csv', 'Download report CSV');
+        downloadCard.style.display = 'block';
+
+        const issueCount = report.filter(r => ['FAILED', 'SKIPPED'].includes(r.RESULT)).length;
+        statCsvRows.textContent = records.length;
+        statImages.textContent = imageFiles.length;
+        statRenamed.textContent = renamedCount;
+        statIssues.textContent = issueCount;
+        stats.style.display = 'grid';
+
+        renderReport(report);
+      } catch (error) {
+        renderReport([{
+          RESULT: 'FAILED',
+          OLD_IMAGE_KEY: '',
+          NEW_IMAGE_KEY: '',
+          ORIGINAL_FILE: '',
+          OUTPUT_FILE: '',
+          REASON: error.message || String(error)
+        }]);
+      } finally {
+        processBtn.disabled = false;
+        processBtn.textContent = 'Process Images';
+      }
+    }
+
+    function resetTool() {
+      csvInput.value = '';
+      folderInput.value = '';
+      includeRowReview.checked = false;
+      includeSplitReview.checked = false;
+      copyUnchanged.checked = true;
+      reportBody.innerHTML = '<tr><td colspan="5" class="small">No processing run yet.</td></tr>';
+      stats.style.display = 'none';
+      downloadCard.style.display = 'none';
+      downloads.innerHTML = '';
+    }
+
+    processBtn.addEventListener('click', processImages);
+    resetBtn.addEventListener('click', resetTool);
+  </script>
+</body>
+</html>
