@@ -447,8 +447,8 @@
     }
 
     function escapeRegExp(value) {
-      return String(value).replace(/[.*+?^${}()|[\]\]/g, '\$&');
-    }
+      return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
 
     function buildKeyRegex(key) {
       // Support:
@@ -722,7 +722,7 @@
     resetBtn.addEventListener('click', resetTool);
   </script>
   <div style="text-align:center; font-size:11px; color:#6b7280; padding:12px 0 18px;">
-    V3
+    V4
   </div>
 </body>
 </html>
